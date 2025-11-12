@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Minka Pattern Generator</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <aside class="sidebar">
+        <h1>Minka Pattern Generator</h1>
+        
+        <div class="control-group">
+          <label>
+            Random Seed:
+            <input type="text" id="seed" value="pattern-2024" />
+          </label>
+        </div>
+        
+        <div class="control-group">
+          <label>
+            <input type="checkbox" id="randomRotation" checked />
+            Random Rotation (0/90/180/270)
+          </label>
+        </div>
+        
+        <div class="control-group">
+          <label>
+            <input type="checkbox" id="allowFlips" />
+            Allow Flips
+          </label>
+        </div>
+        
+        <div class="button-group">
+          <button id="randomizeBtn">Randomize</button>
+          <button id="downloadBtn">Download SVG</button>
+        </div>
+      </aside>
+      
+      <main class="preview-area">
+        <svg id="preview" xmlns="http://www.w3.org/2000/svg">
+          <defs id="seed-defs"></defs>
+        </svg>
+      </main>
+    </div>
+    
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
+

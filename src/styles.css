@@ -1,0 +1,112 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background: white;
+  color: #333;
+}
+
+.container {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 320px;
+  background: white;
+  padding: 24px;
+  overflow-y: auto;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar h1 {
+  font-size: 24px;
+  margin-bottom: 24px;
+  color: #222;
+}
+
+.control-group {
+  margin-bottom: 16px;
+}
+
+.control-group label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: #555;
+}
+
+.control-group input[type="number"],
+.control-group input[type="text"],
+.control-group input[type="color"] {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.control-group input[type="checkbox"] {
+  margin-right: 8px;
+}
+
+.control-group input[type="checkbox"] + label {
+  display: inline;
+  font-weight: normal;
+}
+
+.button-group {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.button-group button,
+.file-upload-label {
+  padding: 12px 16px;
+  background: #333;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+  text-align: center;
+  display: block;
+}
+
+.button-group button:hover,
+.file-upload-label:hover {
+  background: #555;
+}
+
+.button-group button:active,
+.file-upload-label:active {
+  background: #222;
+}
+
+.preview-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  background: white;
+  overflow: auto;
+}
+
+#preview {
+  display: block;
+  background: transparent;
+  transform: scale(0.5);
+  transform-origin: center center;
+}
+
