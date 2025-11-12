@@ -25,6 +25,7 @@ interface AppState {
   seed: string;
   randomRotation: boolean;
   allowFlips: boolean;
+  blackClustering: boolean;
 }
 
 const defaultState: AppState = {
@@ -33,13 +34,15 @@ const defaultState: AppState = {
   tileSize: 200, // Doubled from 100 to make output 1600px × 1000px
   seed: 'pattern-2024',
   randomRotation: true,
-  allowFlips: false
+  allowFlips: false,
+  blackClustering: true
 };
 
 let state: AppState = { ...defaultState };
 let seedCount = 0;
 // Track SVG sizes: 1 = 1x1 (200x200), 2 = 2x2 (400x400)
 const seedSizes = new Map<string, number>(); // seedId -> size
+const seedMetadata = new Map<string, { filename: string; size: number }>(); // seedId -> metadata
 const smallSeeds: string[] = [];
 const largeSeeds: string[] = [];
 
@@ -49,8 +52,13 @@ const seedDefs = document.getElementById('seed-defs') as unknown as SVGDefsEleme
 const seedInput = document.getElementById('seed') as HTMLInputElement;
 const randomRotationCheck = document.getElementById('randomRotation') as HTMLInputElement;
 const allowFlipsCheck = document.getElementById('allowFlips') as HTMLInputElement;
+const blackClusteringCheck = document.getElementById('blackClustering') as HTMLInputElement;
 const randomizeBtn = document.getElementById('randomizeBtn') as HTMLButtonElement;
 const downloadBtn = document.getElementById('downloadBtn') as HTMLButtonElement;
+const uploadInput = document.getElementById('uploadInput') as HTMLInputElement;
+const clearSeedsBtn = document.getElementById('clearSeedsBtn') as HTMLButtonElement;
+const seedList = document.getElementById('seedList') as HTMLElement;
+const previewOverlay = document.getElementById('previewOverlay') as HTMLElement;
 
 // Load state from localStorage
 function loadState(): void {
@@ -72,6 +80,7 @@ function loadState(): void {
   seedInput.value = state.seed;
   randomRotationCheck.checked = state.randomRotation;
   allowFlipsCheck.checked = state.allowFlips;
+  blackClusteringCheck.checked = state.blackClustering;
 }
 
 // Save state to localStorage
@@ -95,6 +104,7 @@ function createFallbackShapes(): void {
   solidBlack.appendChild(blackRect);
   seedDefs.appendChild(solidBlack);
   seedSizes.set(seedId1, 1);
+  seedMetadata.set(seedId1, { filename: 'Fallback: Solid Black', size: 1 });
   smallSeeds.push(seedId1);
   
   // Solid gray rectangle
@@ -111,6 +121,7 @@ function createFallbackShapes(): void {
   solidGray.appendChild(grayRect);
   seedDefs.appendChild(solidGray);
   seedSizes.set(seedId2, 1);
+  seedMetadata.set(seedId2, { filename: 'Fallback: Solid Gray', size: 1 });
   smallSeeds.push(seedId2);
   
   // Solid white rectangle
@@ -127,6 +138,7 @@ function createFallbackShapes(): void {
   solidWhite.appendChild(whiteRect);
   seedDefs.appendChild(solidWhite);
   seedSizes.set(seedId3, 1);
+  seedMetadata.set(seedId3, { filename: 'Fallback: Solid White', size: 1 });
   smallSeeds.push(seedId3);
   
   // Thin vertical stripes (2px wide)
@@ -147,6 +159,7 @@ function createFallbackShapes(): void {
   }
   seedDefs.appendChild(thinStripes);
   seedSizes.set(seedId4, 1);
+  seedMetadata.set(seedId4, { filename: 'Fallback: Thin Stripes', size: 1 });
   smallSeeds.push(seedId4);
   
   // Medium vertical stripes (5px wide)
@@ -172,6 +185,7 @@ function createFallbackShapes(): void {
   }
   seedDefs.appendChild(mediumStripes);
   seedSizes.set(seedId5, 1);
+  seedMetadata.set(seedId5, { filename: 'Fallback: Medium Stripes', size: 1 });
   smallSeeds.push(seedId5);
   
   // Thick vertical stripes (10px wide)
@@ -197,6 +211,7 @@ function createFallbackShapes(): void {
   }
   seedDefs.appendChild(thickStripes);
   seedSizes.set(seedId6, 1);
+  seedMetadata.set(seedId6, { filename: 'Fallback: Thick Stripes', size: 1 });
   smallSeeds.push(seedId6);
   
   // Variable width stripes (mixed sizes)
@@ -231,40 +246,245 @@ function createFallbackShapes(): void {
   }
   seedDefs.appendChild(variableStripes);
   seedSizes.set(seedId7, 1);
+  seedMetadata.set(seedId7, { filename: 'Fallback: Variable Stripes', size: 1 });
   smallSeeds.push(seedId7);
+  
+  updateSeedListUI();
+}
+
+// Detect SVG size from dimensions
+function detectSVGSize(svgRoot: SVGElement): number | null {
+  let width: number, height: number;
+  
+  // Check viewBox first: "0 0 width height"
+  const viewBox = svgRoot.getAttribute('viewBox');
+  if (viewBox) {
+    const parts = viewBox.split(/\s+/);
+    if (parts.length >= 4) {
+      width = parseFloat(parts[2]);
+      height = parseFloat(parts[3]);
+    } else {
+      return null;
+    }
+  } else {
+    // Fall back to width/height attributes
+    const widthAttr = svgRoot.getAttribute('width') || '0';
+    const heightAttr = svgRoot.getAttribute('height') || '0';
+    width = parseFloat(widthAttr.replace('px', ''));
+    height = parseFloat(heightAttr.replace('px', ''));
+  }
+  
+  // Validate exact dimensions
+  if (width === 200 && height === 200) return 1;
+  if (width === 400 && height === 400) return 2;
+  return null; // Invalid size
 }
 
 // Helper function to add SVG symbol and track its size
-function addSVGSymbol(svgRoot: SVGElement, size: number): void {
-  let viewBox = svgRoot.getAttribute('viewBox');
-  if (!viewBox) {
-    const width = svgRoot.getAttribute('width') || '100';
-    const height = svgRoot.getAttribute('height') || '100';
-    viewBox = `0 0 ${width} ${height}`;
+function addSVGSymbol(svgRoot: SVGElement, size: number, filename: string = ''): void {
+  // Extract filename from path if not provided
+  if (!filename && svgRoot.getAttribute('data-filename')) {
+    filename = svgRoot.getAttribute('data-filename') || '';
   }
+  
+  // Normalize viewBox to exact dimensions: 200x200 for size 1, 400x400 for size 2
+  const expectedSize = size === 1 ? 200 : 400;
+  const viewBox = `0 0 ${expectedSize} ${expectedSize}`;
+  
+  // Get the original viewBox or dimensions to calculate scale
+  let originalViewBox = svgRoot.getAttribute('viewBox');
+  let originalWidth = 0;
+  let originalHeight = 0;
+  
+  if (originalViewBox) {
+    const parts = originalViewBox.split(/\s+/);
+    if (parts.length >= 4) {
+      originalWidth = parseFloat(parts[2]);
+      originalHeight = parseFloat(parts[3]);
+    }
+  } else {
+    const widthAttr = svgRoot.getAttribute('width') || '0';
+    const heightAttr = svgRoot.getAttribute('height') || '0';
+    originalWidth = parseFloat(widthAttr.replace('px', ''));
+    originalHeight = parseFloat(heightAttr.replace('px', ''));
+  }
+  
+  // If we have original dimensions, calculate scale to fit expected size
+  const scaleX = originalWidth > 0 ? expectedSize / originalWidth : 1;
+  const scaleY = originalHeight > 0 ? expectedSize / originalHeight : 1;
   
   const symbol = document.createElementNS('http://www.w3.org/2000/svg', 'symbol');
   const seedId = `seed-${seedCount++}`;
   symbol.id = seedId;
   symbol.setAttribute('viewBox', viewBox);
   
+  // Wrap content in a group and scale if needed
+  const contentGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  if (scaleX !== 1 || scaleY !== 1) {
+    contentGroup.setAttribute('transform', `scale(${scaleX}, ${scaleY})`);
+  }
+  
   Array.from(svgRoot.childNodes).forEach(child => {
     if (child.nodeType === Node.ELEMENT_NODE) {
-      symbol.appendChild(child.cloneNode(true));
+      contentGroup.appendChild(child.cloneNode(true));
     }
   });
   
+  symbol.appendChild(contentGroup);
+  
   seedDefs.appendChild(symbol);
   seedSizes.set(seedId, size);
+  seedMetadata.set(seedId, { filename, size });
   
   if (size === 1) {
     smallSeeds.push(seedId);
   } else if (size === 2) {
     largeSeeds.push(seedId);
   }
+  
+  updateSeedListUI();
+}
+
+// Update seed list UI
+function updateSeedListUI(): void {
+  if (!seedList) return;
+  
+  seedList.innerHTML = '';
+  
+  if (seedCount === 0) {
+    seedList.innerHTML = '<p style="color: #999; font-size: 12px;">No seeds loaded. Upload SVGs to get started.</p>';
+    return;
+  }
+  
+  // Show count
+  const countText = document.createElement('p');
+  countText.style.cssText = 'font-size: 12px; color: #666; margin-bottom: 8px;';
+  countText.textContent = `${smallSeeds.length} small (200×200), ${largeSeeds.length} large (400×400)`;
+  seedList.appendChild(countText);
+  
+  // List all seeds
+  seedMetadata.forEach((metadata, seedId) => {
+    const seedItem = document.createElement('div');
+    seedItem.className = 'seed-item';
+    
+    const seedName = document.createElement('span');
+    seedName.className = 'seed-name';
+    seedName.textContent = metadata.filename || seedId;
+    
+    const seedSize = document.createElement('span');
+    seedSize.className = 'seed-size';
+    seedSize.textContent = metadata.size === 1 ? '200×200' : '400×400';
+    
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'seed-remove';
+    removeBtn.textContent = '×';
+    removeBtn.addEventListener('click', () => removeSeed(seedId));
+    
+    seedItem.appendChild(seedName);
+    seedItem.appendChild(seedSize);
+    seedItem.appendChild(removeBtn);
+    seedList.appendChild(seedItem);
+  });
+}
+
+// Remove a single seed
+function removeSeed(seedId: string): void {
+  // Remove from DOM
+  const symbol = seedDefs.querySelector(`#${seedId}`);
+  if (symbol) {
+    symbol.remove();
+  }
+  
+  // Remove from tracking
+  seedSizes.delete(seedId);
+  seedMetadata.delete(seedId);
+  
+  // Remove from arrays
+  const smallIndex = smallSeeds.indexOf(seedId);
+  if (smallIndex > -1) {
+    smallSeeds.splice(smallIndex, 1);
+  }
+  const largeIndex = largeSeeds.indexOf(seedId);
+  if (largeIndex > -1) {
+    largeSeeds.splice(largeIndex, 1);
+  }
+  
+  seedCount--;
+  
+  updateSeedListUI();
+  generatePattern();
+}
+
+// Clear all seeds
+function clearSeeds(): void {
+  seedDefs.innerHTML = '';
+  seedCount = 0;
+  seedSizes.clear();
+  seedMetadata.clear();
+  smallSeeds.length = 0;
+  largeSeeds.length = 0;
+  
+  updateSeedListUI();
+  generatePattern();
+}
+
+// Handle file upload
+async function handleFileUpload(files: FileList | null): Promise<void> {
+  if (!files || files.length === 0) return;
+  
+  const errors: string[] = [];
+  let successCount = 0;
+  
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    
+    // Check file type
+    if (!file.name.endsWith('.svg') && file.type !== 'image/svg+xml') {
+      errors.push(`${file.name}: Not an SVG file`);
+      continue;
+    }
+    
+    try {
+      const text = await file.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(text, 'image/svg+xml');
+      const svgRoot = doc.documentElement as unknown as SVGElement;
+      
+      if (svgRoot.tagName !== 'svg') {
+        errors.push(`${file.name}: Invalid SVG format`);
+        continue;
+      }
+      
+      // Detect size
+      const size = detectSVGSize(svgRoot);
+      if (size === null) {
+        errors.push(`${file.name}: Must be exactly 200×200 or 400×400 pixels`);
+        continue;
+      }
+      
+      // Add the SVG
+      addSVGSymbol(svgRoot, size, file.name);
+      successCount++;
+    } catch (error) {
+      errors.push(`${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+  
+  // Show results
+  if (errors.length > 0) {
+    alert(`Uploaded ${successCount} file(s) successfully.\n\nErrors:\n${errors.join('\n')}`);
+  } else if (successCount > 0) {
+    // Silent success if all files uploaded
+  }
+  
+  // Regenerate pattern if any files were added
+  if (successCount > 0) {
+    generatePattern();
+  }
 }
 
 // Load SVGs from both svg-v2 (200x200, 1x1) and svg-large (400x400, 2x2) directories
+// (Kept for reference, but not called automatically)
 async function loadDefaultSVGs(): Promise<void> {
   // Clear existing seeds
   seedDefs.innerHTML = '';
@@ -304,7 +524,9 @@ async function loadDefaultSVGs(): Promise<void> {
           const svgRoot = doc.documentElement as unknown as SVGElement;
           
           if (svgRoot.tagName === 'svg') {
-            addSVGSymbol(svgRoot, 1); // 1x1 grid space
+            // Extract filename from path
+            const filename = svgPath.split('/').pop() || svgPath;
+            addSVGSymbol(svgRoot, 1, filename); // 1x1 grid space
           }
         }
       } catch (e) {
@@ -323,7 +545,9 @@ async function loadDefaultSVGs(): Promise<void> {
           const svgRoot = doc.documentElement as unknown as SVGElement;
           
           if (svgRoot.tagName === 'svg') {
-            addSVGSymbol(svgRoot, 2); // 2x2 grid spaces
+            // Extract filename from path
+            const filename = svgPath.split('/').pop() || svgPath;
+            addSVGSymbol(svgRoot, 2, filename); // 2x2 grid spaces
           }
         }
       } catch (e) {
@@ -413,12 +637,68 @@ function generatePattern(): void {
   const existing = preview.querySelectorAll('g[data-cell]');
   existing.forEach(el => el.remove());
   
-  // Ensure we have seeds
-  if (seedCount === 0) {
-    createFallbackShapes();
+  // Clear any existing empty state message
+  const existingMessage = preview.querySelector('#empty-state-message');
+  if (existingMessage) {
+    existingMessage.remove();
   }
   
+  // Show empty state if no seeds
   if (seedCount === 0) {
+    const totalWidth = state.cols * state.tileSize;
+    const totalHeight = state.rows * state.tileSize;
+    
+    // Set SVG attributes
+    preview.setAttribute('width', totalWidth.toString());
+    preview.setAttribute('height', totalHeight.toString());
+    preview.setAttribute('viewBox', `0 0 ${totalWidth} ${totalHeight}`);
+    
+    // Add background rectangle
+    const existingBg = preview.querySelector('#background-rect');
+    if (existingBg) {
+      existingBg.remove();
+    }
+    const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    bgRect.setAttribute('x', '0');
+    bgRect.setAttribute('y', '0');
+    bgRect.setAttribute('width', totalWidth.toString());
+    bgRect.setAttribute('height', totalHeight.toString());
+    bgRect.setAttribute('fill', '#1E1E1E');
+    bgRect.setAttribute('id', 'background-rect');
+    preview.insertBefore(bgRect, preview.firstChild);
+    
+    // Add border rectangle
+    const existingBorder = preview.querySelector('#border-rect');
+    if (existingBorder) {
+      existingBorder.remove();
+    }
+    const borderRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    borderRect.setAttribute('x', '0');
+    borderRect.setAttribute('y', '0');
+    borderRect.setAttribute('width', totalWidth.toString());
+    borderRect.setAttribute('height', totalHeight.toString());
+    borderRect.setAttribute('fill', 'none');
+    borderRect.setAttribute('stroke', '#D3D3D3');
+    borderRect.setAttribute('stroke-width', '2');
+    borderRect.setAttribute('id', 'border-rect');
+    preview.insertBefore(borderRect, preview.firstChild);
+    
+    // Add empty state message
+    const messageGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    messageGroup.setAttribute('id', 'empty-state-message');
+    
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', (totalWidth / 2).toString());
+    text.setAttribute('y', (totalHeight / 2).toString());
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('dominant-baseline', 'middle');
+    text.setAttribute('fill', '#999');
+    text.setAttribute('font-family', 'system-ui, -apple-system, sans-serif');
+    text.setAttribute('font-size', '32');
+    text.textContent = 'Upload seeds to generate a pattern';
+    
+    messageGroup.appendChild(text);
+    preview.appendChild(messageGroup);
     return;
   }
   
@@ -443,15 +723,33 @@ function generatePattern(): void {
   bgRect.setAttribute('width', totalWidth.toString());
   bgRect.setAttribute('height', totalHeight.toString());
   bgRect.setAttribute('fill', '#1E1E1E');
-  bgRect.setAttribute('id', 'background-rect');
-  preview.insertBefore(bgRect, preview.firstChild);
-  
-  // Initialize RNG
+    bgRect.setAttribute('id', 'background-rect');
+    preview.insertBefore(bgRect, preview.firstChild);
+    
+    // Add border rectangle
+    const existingBorder2 = preview.querySelector('#border-rect');
+    if (existingBorder2) {
+      existingBorder2.remove();
+    }
+    const borderRect2 = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    borderRect2.setAttribute('x', '0');
+    borderRect2.setAttribute('y', '0');
+    borderRect2.setAttribute('width', totalWidth.toString());
+    borderRect2.setAttribute('height', totalHeight.toString());
+    borderRect2.setAttribute('fill', 'none');
+    borderRect2.setAttribute('stroke', '#D3D3D3');
+    borderRect2.setAttribute('stroke-width', '2');
+    borderRect2.setAttribute('id', 'border-rect');
+    preview.insertBefore(borderRect2, preview.firstChild);
+    
+    // Initialize RNG
   const seedHash = hashSeed(state.seed);
   const rng = mulberry32(seedHash);
   
-  // Generate clustered empty cells (black will show through)
-  const emptyCells = generateEmptyClusters(state.rows, state.cols, rng);
+  // Generate clustered empty cells (black will show through) if enabled
+  const emptyCells = state.blackClustering 
+    ? generateEmptyClusters(state.rows, state.cols, rng)
+    : new Set<string>();
   
   // Track occupied cells
   const occupied = new Set<string>();
@@ -585,6 +883,7 @@ function updateState(): void {
   state.seed = seedInput.value || 'pattern-2024';
   state.randomRotation = randomRotationCheck.checked;
   state.allowFlips = allowFlipsCheck.checked;
+  state.blackClustering = blackClusteringCheck.checked;
   
   saveState();
   generatePattern();
@@ -601,17 +900,46 @@ function randomize(): void {
 seedInput.addEventListener('input', updateState);
 randomRotationCheck.addEventListener('change', updateState);
 allowFlipsCheck.addEventListener('change', updateState);
+blackClusteringCheck.addEventListener('change', updateState);
 randomizeBtn.addEventListener('click', randomize);
 downloadBtn.addEventListener('click', downloadSVG);
+previewOverlay.addEventListener('click', downloadSVG);
+uploadInput.addEventListener('change', (e) => {
+  const target = e.target as HTMLInputElement;
+  handleFileUpload(target.files);
+});
+clearSeedsBtn.addEventListener('click', clearSeeds);
+
+// Drag and drop
+const dropzone = document.body;
+dropzone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+});
+dropzone.addEventListener('drop', async (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  const files = e.dataTransfer?.files;
+  if (files) {
+    const svgFiles = Array.from(files).filter(f => f.type === 'image/svg+xml' || f.name.endsWith('.svg'));
+    if (svgFiles.length > 0) {
+      const fileList = new DataTransfer();
+      svgFiles.forEach(f => fileList.items.add(f));
+      await handleFileUpload(fileList.files);
+    }
+  }
+});
 
 // Initialize
-(async () => {
+async function initialize(): Promise<void> {
   loadState();
-  await loadDefaultSVGs();
-  // Only use fallback if no SVGs were loaded
+  // Load default SVGs if no seeds are present (first time load)
   if (seedCount === 0) {
-    createFallbackShapes();
+    await loadDefaultSVGs();
   }
   generatePattern();
-})();
+  updateSeedListUI();
+}
+
+initialize();
 

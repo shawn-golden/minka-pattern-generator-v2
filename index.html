@@ -13,7 +13,7 @@
         
         <div class="control-group">
           <label>
-            Random Seed:
+            Seed String:
             <input type="text" id="seed" value="pattern-2024" />
           </label>
         </div>
@@ -32,16 +32,71 @@
           </label>
         </div>
         
+        <div class="control-group">
+          <label>
+            <input type="checkbox" id="blackClustering" checked />
+            Empty space clustering
+          </label>
+        </div>
+        
         <div class="button-group">
-          <button id="randomizeBtn">Randomize</button>
-          <button id="downloadBtn">Download SVG</button>
+          <button id="randomizeBtn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <polyline points="1 20 1 14 7 14"></polyline>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+            Randomize
+          </button>
+          <label class="file-upload-label">
+            <input type="file" id="uploadInput" multiple accept=".svg" style="display: none;" />
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+            Upload SVGs
+          </label>
+          <button id="clearSeedsBtn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+            Clear Seeds
+          </button>
+          <button id="downloadBtn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Download Pattern (svg)
+          </button>
+        </div>
+        
+        <div class="control-group">
+          <h3>Seeds</h3>
+          <div id="seedList" class="seed-list"></div>
         </div>
       </aside>
       
       <main class="preview-area">
-        <svg id="preview" xmlns="http://www.w3.org/2000/svg">
-          <defs id="seed-defs"></defs>
-        </svg>
+        <label class="preview-label">preview</label>
+        <div class="preview-container">
+          <svg id="preview" xmlns="http://www.w3.org/2000/svg">
+            <defs id="seed-defs"></defs>
+          </svg>
+          <div class="preview-overlay" id="previewOverlay">
+            <div class="preview-download-content">
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Download Pattern (SVG)
+            </div>
+          </div>
+        </div>
       </main>
     </div>
     
