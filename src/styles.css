@@ -57,9 +57,10 @@ body {
 }
 
 .sidebar h1 {
-  font-size: 24px;
+  font-size: 22px;
   margin-bottom: 24px;
   color: #222;
+  font-weight: 400;
 }
 
 .control-group {

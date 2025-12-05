@@ -9,7 +9,8 @@
   <body>
     <div class="container">
       <aside class="sidebar">
-        <h1>Minka Pattern Generator</h1>
+        <img src="/logo/minka-logo.svg" alt="Minka Logo" style="max-width: 60%; margin-bottom: 1rem;" />
+        <h1>Pattern Generator</h1>
         
         <div class="control-group">
           <label>
@@ -55,7 +56,7 @@
               <polyline points="17 8 12 3 7 8"></polyline>
               <line x1="12" y1="3" x2="12" y2="15"></line>
             </svg>
-            Upload SVGs
+            Upload Seeds (.svg)
           </label>
           <button id="clearSeedsBtn">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -81,7 +82,6 @@
       </aside>
       
       <main class="preview-area">
-        <label class="preview-label">preview</label>
         <div class="preview-container">
           <svg id="preview" xmlns="http://www.w3.org/2000/svg">
             <defs id="seed-defs"></defs>
